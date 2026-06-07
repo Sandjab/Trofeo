@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trofeo"
+version = "0.0.1"
+description = "Pilote expérimental (first light) de l'écran Thermalright Trofeo Vision — HID / Type 2"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "hid>=1.0.5",   # binding hidapi ; lib native requise : `brew install hidapi`
+    "pillow>=9.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[project.scripts]
+trofeo-first-light = "scripts.first_light:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["trofeo*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

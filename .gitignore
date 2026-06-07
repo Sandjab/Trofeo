@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Sorties locales (mires sauvées, dumps)
+*.jpg
+*.jpeg
+*.bin
+
+# Swift / SwiftPM (port à venir)
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
