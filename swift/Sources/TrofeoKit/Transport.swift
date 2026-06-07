@@ -82,8 +82,22 @@ public final class TrofeoDevice {
         let device = deviceRaw.bindMemory(to: UnsafeMutablePointer<IOUSBDeviceInterface>?.self, capacity: 1)
         defer { _ = device.pointee?.pointee.Release(UnsafeMutableRawPointer(device)) }
 
+        // USBDeviceReEnumerate exige le device OUVERT au niveau USB, sinon
+        // kIOReturnNotOpen (0xE00002CD). On n'ouvre que le device (pas l'interface
+        // HID, que IOHIDFamily verrouille) : Seize en repli si déjà ouvert ailleurs.
+        var openKr = device.pointee?.pointee.USBDeviceOpen(UnsafeMutableRawPointer(device))
+        if openKr != kIOReturnSuccess {
+            openKr = device.pointee?.pointee.USBDeviceOpenSeize(UnsafeMutableRawPointer(device))
+        }
+        guard openKr == kIOReturnSuccess else {
+            throw TransportError.resetFailed("USBDeviceOpen \(openKr.map(String.init) ?? "nil")")
+        }
+
         let rr = device.pointee?.pointee.USBDeviceReEnumerate(UnsafeMutableRawPointer(device), 0)
+        // Après ré-énumération le device disparaît du bus : le handle devient
+        // caduc, inutile de USBDeviceClose (Release suffit).
         guard rr == kIOReturnSuccess else {
+            _ = device.pointee?.pointee.USBDeviceClose(UnsafeMutableRawPointer(device))
             throw TransportError.resetFailed("USBDeviceReEnumerate \(rr.map(String.init) ?? "nil")")
         }
     }

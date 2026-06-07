@@ -9,8 +9,8 @@ sans dépendance tierce. Destiné à être consommé par [Iris](../../Iris).
 |---|---|---|---|
 | `Sources/TrofeoKit/Protocol.swift` | pur : init / handshake / frame | `trofeo/protocol.py` | ✅ `swift test` 11/11 |
 | `Sources/TrofeoKit/Render.swift` | CoreGraphics/CoreText → JPEG (ImageIO) | `trofeo/render.py` | ✅ rendu image conforme |
-| `Sources/TrofeoKit/Transport.swift` | reset-loop : IOUSBLib reset + IOHIDManager SetReport | `trofeo/transport.py` | ⚠️ compile, **test matériel en attente** |
-| `Sources/trofeo-cli/main.swift` | CLI (run / pattern / reset / preview) | `scripts/run.py` | ⚠️ idem |
+| `Sources/TrofeoKit/Transport.swift` | reset-loop : IOUSBLib reset + IOHIDManager SetReport | `trofeo/transport.py` | ✅ **validé matériel** (30/30 frames, ~2 fps) |
+| `Sources/trofeo-cli/main.swift` | CLI (run / pattern / reset / preview) | `scripts/run.py` | ✅ pilote l'écran |
 
 ## Le cycle (Transport)
 
@@ -38,15 +38,19 @@ swift test                      # Protocol : 11/11
 .build/debug/trofeo-cli run 30             # horloge live ~3 fps, 30 s
 ```
 
-## Points à valider sur matériel (au retour)
+## Validé sur matériel (2026-06-07)
 
-- Le **reset IOUSBLib** ré-énumère bien le device (équivalent du `reset_device()` pyusb).
-- `IOHIDDeviceSetReport` accepte init puis frame après ré-énumération.
-- **Non implémenté volontairement** : lecture de la réponse handshake (interrupt-IN via
-  input-report callback). On s'appuie sur le succès des SetReport ; à ajouter si le
-  firmware l'exige.
-- Métriques : le CLI affiche load + uptime ; CPU%/RAM% (host_statistics) restent à porter
-  depuis la version Python (psutil).
+`trofeo-cli run 15` → **30/30 frames, 0 ratée, ~2 fps**, écran piloté en continu.
+Détail clé : `USBDeviceReEnumerate` exige d'abord `USBDeviceOpen` au niveau device
+(sinon `kIOReturnNotOpen 0xE00002CD`) — on ouvre le device, pas l'interface HID.
+
+## Améliorations possibles
+
+- **Cadence** : ~2 fps (la ré-énumération IOKit + un `usleep` de pacing). On peut viser
+  plus haut en retirant le pacing et/ou en affinant l'attente de ré-énumération.
+- **Handshake** : on ne lit pas la réponse (input-report callback) — on s'appuie sur le
+  succès des SetReport ; ça marche, à ajouter seulement si besoin.
+- **Métriques** : CLI = load + uptime ; CPU%/RAM% (host_statistics) à porter depuis psutil.
 
 ## Source de vérité
 
