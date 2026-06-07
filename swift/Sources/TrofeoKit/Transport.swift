@@ -141,11 +141,11 @@ public final class TrofeoDevice {
                     IOHIDManagerClose(mgr, IOOptionBits(kIOHIDOptionsTypeNone))
                 }
                 if setReport(dev, TrofeoProtocol.buildInitPacket()) == kIOReturnSuccess {
-                    usleep(5000)
+                    usleep(2000)
                     if setReport(dev, frame) == kIOReturnSuccess { return }
                 }
             }
-            usleep(80_000)
+            usleep(15_000)  // poll serré pendant la ré-énumération
         }
         throw TransportError.notReady
     }

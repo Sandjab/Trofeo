@@ -62,16 +62,20 @@ case "preview":  // rendu vers fichier, sans matériel (vérif du design)
     try? Render.jpeg(Render.testPattern(), quality: 0.92).write(to: URL(fileURLWithPath: "\(dir)/swift_pattern.jpg"))
     print("preview écrit dans \(dir)/swift_dashboard.jpg + swift_pattern.jpg")
 
-default:  // run
+default:  // run [secondes] [fps]
     let duration = args.count > 2 ? Double(args[2]) : nil
+    let fpsCap = args.count > 3 ? Double(args[3]) : nil          // throttle optionnel
+    let minInterval = fpsCap.map { 1.0 / max(0.5, $0) } ?? 0.0   // 0 = cadence max
     let start = Date()
     var ok = 0, ko = 0
     print("Trofeo live (Swift) — Ctrl-C pour arrêter.")
     while true {
+        let t0 = Date()
         do { try device.sendFrame(dashboardFrame()); ok += 1 }
         catch { ko += 1; warn("frame KO: \(error)") }
         if let duration, Date().timeIntervalSince(start) >= duration { break }
-        usleep(330_000)  // ~3 fps
+        let dt = Date().timeIntervalSince(t0)
+        if minInterval > dt { usleep(UInt32((minInterval - dt) * 1_000_000)) }
     }
     let el = Date().timeIntervalSince(start)
     print("Fini : \(ok) frames (\(ko) ratées) en \(String(format: "%.1f", el))s ≈ \(String(format: "%.1f", Double(ok) / max(el, 0.001))) fps")
