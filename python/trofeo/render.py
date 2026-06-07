@@ -83,22 +83,49 @@ def to_jpeg(img: Image.Image, quality: int = 95) -> bytes:
     return buf.getvalue()
 
 
-def status_screen(big: str, lines=None, width: int = WIDTH, height: int = HEIGHT) -> Image.Image:
-    """Écran de statut : un grand texte central (ex. l'heure) + une ligne d'infos.
+def _bar_color(frac: float) -> tuple:
+    """Vert / orange / rouge selon le taux de remplissage."""
+    if frac < 0.75:
+        return (90, 200, 140)
+    if frac < 0.90:
+        return (230, 175, 70)
+    return (230, 90, 90)
 
-    Contenu volontairement simple pour le prototype de boucle live ; à enrichir
-    selon l'usage (métriques, jauges…).
+
+def dashboard(clock: str, date: str, bars=None, lines=None,
+              width: int = WIDTH, height: int = HEIGHT) -> Image.Image:
+    """Tableau de bord : grande horloge + date à gauche ; barres + lignes à droite.
+
+    ``bars`` : liste de ``(label, fraction)`` rendues en jauges colorées.
+    ``lines`` : liste de ``(label, valeur)`` rendues en texte.
     """
-    img = Image.new("RGB", (width, height), (10, 12, 20))
+    img = Image.new("RGB", (width, height), (12, 14, 22))
     draw = ImageDraw.Draw(img)
-    draw.rectangle([0, 0, width - 1, height - 1], outline=(40, 44, 60))
 
-    big_font = ImageFont.load_default(size=230)
-    draw.text((width // 2, int(height * 0.42)), big, fill=(238, 240, 255),
-              anchor="mm", font=big_font)
+    # Zone gauche : horloge + date.
+    clock_font = ImageFont.load_default(size=168)
+    date_font = ImageFont.load_default(size=46)
+    left_cx = 300
+    draw.text((left_cx, 205), clock, fill=(240, 242, 255), anchor="mm", font=clock_font)
+    draw.text((left_cx, 320), date, fill=(150, 165, 200), anchor="mm", font=date_font)
 
-    if lines:
-        sub_font = ImageFont.load_default(size=44)
-        draw.text((width // 2, height - 56), "    ".join(lines), fill=(150, 168, 205),
-                  anchor="mm", font=sub_font)
+    draw.line([(600, 50), (600, height - 50)], fill=(40, 44, 60), width=2)
+
+    # Zone droite : jauges puis lignes.
+    label_font = ImageFont.load_default(size=40)
+    rx0, rx1 = 650, width - 50
+    y = 72
+    for label, frac in (bars or []):
+        frac = max(0.0, min(1.0, frac))
+        draw.text((rx0, y), label, fill=(170, 185, 215), anchor="lm", font=label_font)
+        draw.text((rx1, y), f"{int(frac * 100)}%", fill=(240, 242, 255), anchor="rm", font=label_font)
+        by = y + 32
+        draw.rectangle([rx0, by, rx1, by + 22], fill=(30, 34, 48))
+        draw.rectangle([rx0, by, rx0 + int((rx1 - rx0) * frac), by + 22], fill=_bar_color(frac))
+        y += 96
+    for label, value in (lines or []):
+        draw.text((rx0, y), label, fill=(170, 185, 215), anchor="lm", font=label_font)
+        draw.text((rx1, y), value, fill=(220, 225, 240), anchor="rm", font=label_font)
+        y += 58
+
     return img

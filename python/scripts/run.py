@@ -21,21 +21,37 @@ import os
 import sys
 import time
 
+import psutil
+
 sys.path.insert(0, __file__.rsplit("/scripts/", 1)[0])
 
 from trofeo import protocol, render  # noqa: E402
 from trofeo.transport import TrofeoDevice, TransportError  # noqa: E402
 
 
-def _system_lines(fps: float) -> list[str]:
-    lines = [time.strftime("%a %d %b")]
+def _uptime_str() -> str:
+    secs = int(time.time() - psutil.boot_time())
+    days, rem = divmod(secs, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+    return f"{days}d {hours:02d}h" if days else f"{hours:02d}h {minutes:02d}m"
+
+
+def _metrics(fps: float):
+    """Renvoie (bars, lines) pour le dashboard."""
+    bars = [
+        ("CPU", psutil.cpu_percent() / 100.0),
+        ("RAM", psutil.virtual_memory().percent / 100.0),
+    ]
+    lines = []
     try:
-        load1 = os.getloadavg()[0]
-        lines.append(f"load {load1:.2f}")
+        l1, l5, l15 = os.getloadavg()
+        lines.append(("LOAD", f"{l1:.2f} {l5:.2f} {l15:.2f}"))
     except (OSError, AttributeError):
         pass
-    lines.append(f"{fps:.1f} fps")
-    return lines
+    lines.append(("UPTIME", _uptime_str()))
+    lines.append(("REFRESH", f"{fps:.1f} fps"))
+    return bars, lines
 
 
 def main() -> int:
@@ -61,8 +77,8 @@ def main() -> int:
     try:
         while True:
             t0 = time.monotonic()
-            big = time.strftime("%H:%M:%S")
-            img = render.status_screen(big, _system_lines(fps_live))
+            bars, lines = _metrics(fps_live)
+            img = render.dashboard(time.strftime("%H:%M:%S"), time.strftime("%a %d %b"), bars, lines)
             frame = protocol.build_frame(render.to_jpeg(img, args.quality), render.WIDTH, render.HEIGHT)
             try:
                 dev.send_frame(frame)

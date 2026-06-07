@@ -12,6 +12,7 @@ dependencies = [
     "hid>=1.0.5",    # binding hidapi (écriture frame) ; natif : `brew install hidapi`
     "pyusb>=1.2",    # libusb (reset device) ; natif : `brew install libusb`
     "pillow>=9.0",
+    "psutil>=5.9",   # métriques système (CPU/RAM) pour le dashboard
 ]
 
 [project.optional-dependencies]
