@@ -1,37 +1,20 @@
-# swift/ — port natif TrofeoKit (à venir)
+# swift/ — port natif (plan initial invalidé)
 
-Placeholder. Le port Swift démarre **une fois le first light Python validé**
-(PM byte réel confirmé, taille de report et préfixe Report ID levés sur matériel).
+> ⚠️ **Le plan « `TrofeoKit` via IOHIDManager » est abandonné pour le streaming.**
+> Prouvé sur matériel : ce device est sur une interface **HID-class** verrouillée par
+> IOHIDFamily ; IOHIDManager n'émet qu'**une** frame puis ne peut pas faire le
+> clear-halt/reset requis, et libusb ne peut pas claim l'interface (Errno 13). Détails
+> et options : [`../docs/MACOS_FEASIBILITY.md`](../docs/MACOS_FEASIBILITY.md).
 
-## Forme cible
+## Où le Swift reste pertinent
 
-- **`TrofeoKit`** : une bibliothèque **SwiftPM autonome**, consommée par
-  [Iris](../../Iris) comme dépendance (cohérent avec l'archi modulaire d'Iris :
-  `IrisKit` / `irisd` / `IrisAppCore`).
-- **Transport : IOHIDManager direct via IOKit**, bridgé Swift. **Aucune**
-  dépendance hidapi ou libusb au runtime — le Trofeo est HID natif, donc pas de
-  driver tiers ni de permissions élevées.
+Pas pour parler USB à l'écran sur macOS (impossible en userspace). Mais selon
+l'architecture retenue (décision en attente), un composant Swift peut servir de
+**client** côté Mac :
 
-## Découpage prévu (miroir du prototype Python)
+- compose les frames / collecte les métriques système,
+- les pousse en **réseau** vers un daemon Linux déporté (RPi) branché à l'écran,
+- côté Iris : intégration en tant qu'émetteur de données, pas en tant que pilote USB.
 
-| Unité | Rôle | Équivalent Python |
-|---|---|---|
-| `Protocol` | pur, testable : paquets / handshake / frame | `trofeo/protocol.py` |
-| `Transport` | IOHIDManager (open par VID/PID, write/read de reports) | `trofeo/transport.py` |
-| `Render` | image → JPEG (CoreGraphics / ImageIO) | `trofeo/render.py` |
-
-## Source de vérité
-
-Le protocole filaire est figé dans [`../docs/PROTOCOL.md`](../docs/PROTOCOL.md).
-Le port Swift s'écrit **à partir de ce document** (clean-room, MIT), pas en
-recopiant le code de référence GPL.
-
-## Notes d'implémentation IOHIDManager (préparatoires)
-
-- Ouverture : `IOHIDManagerCreate` → matching `{ VendorID: 0x0416, ProductID: 0x5302 }`
-  → `IOHIDManagerOpen`.
-- Écriture : `IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, reportID, data, len)`.
-  Gérer le Report ID `0x00` comme côté hidapi (voir `PROTOCOL.md` §2).
-- Lecture du handshake : report d'entrée via `IOHIDDeviceGetReport` /
-  `IOHIDDeviceRegisterInputReportCallback`.
-- À valider : taille max de report pour pousser un JPEG entier en un `SetReport`.
+Le découpage du prototype Python (`Protocol` pur / `Render`) reste réutilisable en
+Swift ; seul le `Transport` USB ne se porte pas sur macOS.

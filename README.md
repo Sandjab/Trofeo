@@ -3,8 +3,12 @@
 Pilote open-source pour l'écran **Thermalright Trofeo Vision** (6,86″ LCD,
 1280 × 480) sous macOS — sans le logiciel propriétaire Windows (TRCC).
 
-> **Statut :** prototype « first light ». Le protocole est documenté et testé ;
-> reste à le valider sur le matériel réel (lire le PM byte de *ton* écran).
+> **Statut :** first light **validé** sur matériel réel (handshake + 1 image
+> affichée), mais ⚠️ **un mur macOS est apparu** : ce device est sur une interface
+> **HID-class**, dont IOHIDFamily s'empare en exclusif — on ne peut **pas** streamer
+> des frames vers lui en userspace sur macOS. Détails et options dans
+> [`docs/MACOS_FEASIBILITY.md`](docs/MACOS_FEASIBILITY.md). **Décision d'architecture
+> en attente.**
 
 ## Pourquoi
 
@@ -68,10 +72,17 @@ Trofeo/
 
 ## Feuille de route
 
-1. **First light Python** — handshake + image (valider le PM byte réel). ← *ici*
-2. Boucle live (horloge / métriques système).
-3. **Port Swift `TrofeoKit`** — IOHIDManager direct, lib SwiftPM autonome.
-4. Intégration dans **Iris**.
+1. **First light Python** — handshake + image. ✅ **Fait** (PM=128 → 1280×480, mire affichée).
+2. ⚠️ **Mur macOS découvert** : streaming impossible en userspace (interface HID-class
+   verrouillée par IOHIDFamily). Voir [`docs/MACOS_FEASIBILITY.md`](docs/MACOS_FEASIBILITY.md).
+3. **Décision d'architecture** (en attente) :
+   - Daemon Linux déporté (RPi) + client Mac réseau — *recommandé*.
+   - DriverKit dext natif — lourd, succès incertain.
+   - VM Linux + USB passthrough — à vérifier.
+
+> ~~Port Swift `TrofeoKit` via IOHIDManager~~ : **abandonné pour le streaming** —
+> IOHIDManager ne peut pas émettre les transferts de contrôle requis (cul-de-sac
+> prouvé). Un composant Swift reste pertinent côté *client* selon l'architecture choisie.
 
 ## Protocole & clean-room
 

@@ -85,14 +85,19 @@ python scripts/first_light.py --dump-only
 > Python (os.environ avant l'import) ne marche PAS — dyld lit la variable au
 > lancement uniquement. Elle doit être dans l'environnement du shell.
 
-## 9. Port Swift (à venir)
+## 9. Port Swift / macOS — ⚠️ plan initial invalidé
 
-- `TrofeoKit` : SwiftPM library **autonome**, consommée par Iris en dépendance.
-- Transport : **IOHIDManager direct via IOKit**, bridgé Swift. **Aucune** dépendance
-  hidapi/libusb au runtime.
-- Réutiliser le découpage Python : `Protocol` (pur, testable) / `Transport`
-  (IOHIDManager) / `Render` (CoreGraphics).
-- Forme arrêtée une fois le first light Python validé (PM byte confirmé).
+**Le plan « TrofeoKit via IOHIDManager » est un cul-de-sac pour le streaming**
+(prouvé sur matériel, voir `docs/MACOS_FEASIBILITY.md`) : ce device est sur une
+interface **HID-class** que IOHIDFamily verrouille ; IOHIDManager ne peut émettre
+qu'**une** frame puis ne peut pas faire le clear-halt/reset requis ; libusb ne peut
+pas claim l'interface (Errno 13, même en root).
+
+- **Ne pas** repartir sur un transport IOHIDManager/hidapi pour streamer.
+- Décision d'architecture **en attente** (cf. README, feuille de route) :
+  daemon Linux déporté (recommandé) / DriverKit dext (lourd, incertain) / VM passthrough.
+- Le découpage `Protocol` (pur) / `Render` reste réutilisable quel que soit le choix ;
+  seul le `Transport` est impacté.
 
 ## 10. Ce qu'il ne faut PAS faire
 

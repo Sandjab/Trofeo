@@ -34,6 +34,25 @@ driver tiers, sans dépendance externe, sans permissions élevées. On ne tente
 **pas** de `claim_interface` libusb sur une interface HID (IOKit/IOHIDFamily la
 saisit).
 
+**Descripteurs réels (relevés 2026-06-07, pyusb) :**
+
+| Interface | Classe | Endpoints |
+|---|---|---|
+| iface 0 | 0x03 (HID) | **EP 0x02 OUT interrupt, wMaxPacketSize 512** · EP 0x83 IN interrupt, wMaxPacketSize 8 |
+| iface 1 | 0xff (vendor) | aucun endpoint data |
+
+→ Les frames partent sur **EP 0x02 (interrupt OUT, paquets de 512)** — ce qui
+**explique l'alignement à 512** du padding (§4). L'endpoint IN est **0x83**
+(pas 0x81 comme le suggérait le fallback codé en dur de la réf).
+
+**libusb nu = inutilisable sur macOS (confirmé, pas supposé).** `claim_interface(0)`
+→ `Errno 13 Access denied` : IOHIDFamily tient l'interface HID et macOS n'autorise
+pas à détacher ce driver en userspace (sudo n'y change rien pour une interface de
+classe HID). Le transport libusb interrupt-OUT de la réf fonctionne sous Linux,
+**pas** sur macOS pour ce device. → sur macOS, **le stack HID (IOHIDManager) est la
+seule voie** ; un accès USB brut (IOUSBHost) se heurterait au même verrou sur
+iface 0.
+
 ### Report ID (subtilité HID)
 
 En hidapi, le **premier octet de chaque `write` est le Report ID** (`0x00` ici,
@@ -121,8 +140,8 @@ DA DB DC DD | 02 00 | 00 00 | <W u16 LE> <H u16 LE> | 02 00 00 00 | <len u32 LE>
 > ⚠️ **Keepalive nécessaire — corrige la réf.** La réf décrit ce type comme
 > « non-volatile, pas de keepalive ». Faux sur le Trofeo Vision V1.02 : observé
 > en first light (2026-06-07), le device **reprend son UI firmware par défaut
-> après quelques secondes** sans nouvelle frame. Pour maintenir une image custom,
-> il faut donc **réémettre la frame périodiquement**. Période exacte à mesurer.
+> en ~2 secondes** (mesuré) sans nouvelle frame. Pour maintenir une image custom,
+> il faut donc **réémettre la frame plus vite que ~2 s**.
 >
 > ⚠️ **Une seule frame par handshake (observé 2026-06-07).** Séquence reproduite
 > plusieurs fois sur le Trofeo Vision V1.02 :
@@ -163,9 +182,22 @@ DA DB DC DD | 02 00 | 00 00 | <W u16 LE> <H u16 LE> | 02 00 00 00 | <len u32 LE>
 - [x] Absence d'ACK → **OK** : `write` retourne le compte complet, pas de read requis.
 - [x] Rendu visuel → **correct sans rotation ni correction de couleurs** : la mire
       s'affiche dans le bon sens, barres R/V/B dans l'ordre (confirmé à l'œil).
-- [x] Persistance → **NON, et 1 frame par handshake** : la 1ʳᵉ frame s'affiche, la
-      2ᵉ écriture time out et fige le device (replug requis). Voir §4. Le mécanisme
-      d'enchaînement des frames reste **à reverse-engineer** (prochaine étape).
+- [x] Persistance → **NON, et 1 frame par handshake** : la 1ʳᵉ frame s'affiche
+      **~2 s** (mesuré) puis retour à l'UI par défaut ; la 2ᵉ écriture time out et
+      fige le device (replug requis). Voir §4.
+- [x] ACK-drain (lire 0x83 entre deux frames) ? **NON** : le read renvoie vide et
+      la 2ᵉ écriture time out quand même. Aucun statut à drainer.
+- [x] Verrou firmware : après 1 frame, **tout** `SetReport` échoue — y compris un
+      nouveau handshake sur open frais — jusqu'au **replug USB**. C'est un verrou
+      niveau device, pas un bug logiciel.
+- [ ] ⚠️ **BLOQUANT macOS.** Via le stack HID (`IOHIDDeviceSetReport`, le mécanisme
+      commun à hidapi **et** à IOHIDManager/Swift), ce device n'accepte qu'**une**
+      frame puis se verrouille. Le streaming de la réf passe par **libusb
+      interrupt-OUT sur EP 0x02**, voie **bloquée sur macOS** (iface 0 tenue par
+      IOHIDFamily, cf. §2). Questions ouvertes : la réf fonctionne-t-elle
+      *réellement* sur macOS pour ce device (son `open_bulk` macOS pointe sur le
+      même libusb qu'on a vu échouer) ? Existe-t-il une voie macOS — IOUSBHost
+      avec entitlement, dext DriverKit, ou séquence de ré-armement inconnue ?
 
 ---
 
