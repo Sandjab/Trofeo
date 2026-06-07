@@ -1,7 +1,7 @@
 # TrofeoKit — port Swift natif
 
 Port IOKit pur de la reset-loop (cf. [`../docs/MACOS_FEASIBILITY.md`](../docs/MACOS_FEASIBILITY.md)),
-sans dépendance tierce. Destiné à être consommé par [Iris](../../Iris).
+sans dépendance tierce. Destiné à être consommé par [Iris](https://github.com/Sandjab/Iris).
 
 ## Découpage
 

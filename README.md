@@ -1,5 +1,8 @@
 # Trofeo
 
+[![CI](https://github.com/Sandjab/Trofeo/actions/workflows/ci.yml/badge.svg)](https://github.com/Sandjab/Trofeo/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Pilote open-source pour l'écran **Thermalright Trofeo Vision** (6,86″ LCD,
 1280 × 480) sous macOS — sans le logiciel propriétaire Windows (TRCC).
 
@@ -13,7 +16,7 @@ Pilote open-source pour l'écran **Thermalright Trofeo Vision** (6,86″ LCD,
 L'écran est livré avec **TRCC** (Thermalright LCD Control Center), un logiciel
 .NET fermé et **Windows uniquement**. Ce projet pilote l'écran directement, en
 HID natif, pour pouvoir l'utiliser ailleurs — et à terme l'intégrer au projet
-[**Iris**](../Iris) via une lib Swift native.
+[**Iris**](https://github.com/Sandjab/Iris) via une lib Swift native.
 
 ## Le matériel
 

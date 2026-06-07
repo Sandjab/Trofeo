@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    name: Python — protocole
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Les tests sont purs (protocol + render) : pillow suffit, pas de hid/pyusb.
+      - run: pip install pytest pillow
+      - name: pytest
+        working-directory: python
+        run: PYTHONPATH="$PWD" python -m pytest tests/ -q
+
+  swift:
+    name: Swift — TrofeoKit
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift build & test
+        working-directory: swift
+        run: |
+          swift build
+          swift test
