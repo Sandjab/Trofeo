@@ -11,6 +11,16 @@ Pilote open-source pour l'écran **Thermalright Trofeo Vision** (6,86″ LCD,
 > contourne le verrouillage de l'interface HID par IOHIDFamily. Voir
 > [`docs/MACOS_FEASIBILITY.md`](docs/MACOS_FEASIBILITY.md).
 
+## Aperçu
+
+Le dashboard live (horloge + métriques système), tel qu'envoyé à l'écran (rendu 1280×480) :
+
+![Dashboard Trofeo](assets/dashboard.png)
+
+La mire de « first light » qui valide orientation et couleurs d'un coup d'œil :
+
+![Mire de test](assets/test-pattern.png)
+
 ## Pourquoi
 
 L'écran est livré avec **TRCC** (Thermalright LCD Control Center), un logiciel
