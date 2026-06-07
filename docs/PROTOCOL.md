@@ -190,14 +190,12 @@ DA DB DC DD | 02 00 | 00 00 | <W u16 LE> <H u16 LE> | 02 00 00 00 | <len u32 LE>
 - [x] Verrou firmware : après 1 frame, **tout** `SetReport` échoue — y compris un
       nouveau handshake sur open frais — jusqu'au **replug USB**. C'est un verrou
       niveau device, pas un bug logiciel.
-- [ ] ⚠️ **BLOQUANT macOS.** Via le stack HID (`IOHIDDeviceSetReport`, le mécanisme
-      commun à hidapi **et** à IOHIDManager/Swift), ce device n'accepte qu'**une**
-      frame puis se verrouille. Le streaming de la réf passe par **libusb
-      interrupt-OUT sur EP 0x02**, voie **bloquée sur macOS** (iface 0 tenue par
-      IOHIDFamily, cf. §2). Questions ouvertes : la réf fonctionne-t-elle
-      *réellement* sur macOS pour ce device (son `open_bulk` macOS pointe sur le
-      même libusb qu'on a vu échouer) ? Existe-t-il une voie macOS — IOUSBHost
-      avec entitlement, dext DriverKit, ou séquence de ré-armement inconnue ?
+- [x] ✅ **RÉSOLU — reset-loop.** Le lock après 1 frame se casse par un
+      **`libusb reset_device()`** (niveau device, sans claim de l'iface HID, OK sur
+      macOS). Le cycle **reset → handshake → 1 frame** tourne à **~5 fps stable**
+      (125/125 sur 25 s), donc image persistante. Clear-halt EP0 ne suffisait pas
+      (lock plus profond qu'un STALL) ; c'est bien le reset device qui débloque.
+      Implémentation : `python/trofeo/transport.py`. Voir aussi `docs/MACOS_FEASIBILITY.md`.
 
 ---
 

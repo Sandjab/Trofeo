@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import io
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 WIDTH = 1280
 HEIGHT = 480
@@ -81,3 +81,24 @@ def to_jpeg(img: Image.Image, quality: int = 95) -> bytes:
     buf = io.BytesIO()
     img.convert("RGB").save(buf, "JPEG", quality=quality)
     return buf.getvalue()
+
+
+def status_screen(big: str, lines=None, width: int = WIDTH, height: int = HEIGHT) -> Image.Image:
+    """Écran de statut : un grand texte central (ex. l'heure) + une ligne d'infos.
+
+    Contenu volontairement simple pour le prototype de boucle live ; à enrichir
+    selon l'usage (métriques, jauges…).
+    """
+    img = Image.new("RGB", (width, height), (10, 12, 20))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, width - 1, height - 1], outline=(40, 44, 60))
+
+    big_font = ImageFont.load_default(size=230)
+    draw.text((width // 2, int(height * 0.42)), big, fill=(238, 240, 255),
+              anchor="mm", font=big_font)
+
+    if lines:
+        sub_font = ImageFont.load_default(size=44)
+        draw.text((width // 2, height - 56), "    ".join(lines), fill=(150, 168, 205),
+                  anchor="mm", font=sub_font)
+    return img

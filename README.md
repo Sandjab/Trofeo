@@ -3,12 +3,10 @@
 Pilote open-source pour l'écran **Thermalright Trofeo Vision** (6,86″ LCD,
 1280 × 480) sous macOS — sans le logiciel propriétaire Windows (TRCC).
 
-> **Statut :** first light **validé** sur matériel réel (handshake + 1 image
-> affichée), mais ⚠️ **un mur macOS est apparu** : ce device est sur une interface
-> **HID-class**, dont IOHIDFamily s'empare en exclusif — on ne peut **pas** streamer
-> des frames vers lui en userspace sur macOS. Détails et options dans
-> [`docs/MACOS_FEASIBILITY.md`](docs/MACOS_FEASIBILITY.md). **Décision d'architecture
-> en attente.**
+> **Statut :** prototype fonctionnel sur macOS. ✅ Affichage **live à ~5 fps**, stable
+> et fluide, via la « reset-loop » (`reset libusb → handshake → frame hidapi`) qui
+> contourne le verrouillage de l'interface HID par IOHIDFamily. Voir
+> [`docs/MACOS_FEASIBILITY.md`](docs/MACOS_FEASIBILITY.md).
 
 ## Pourquoi
 
@@ -31,7 +29,7 @@ C'est un device **HID natif** : sur macOS il se pilote via **IOHIDManager**
 ## Démarrage rapide (prototype Python)
 
 ```bash
-brew install hidapi                 # lib HID native
+brew install hidapi libusb          # natifs : écriture frame (hidapi) + reset (libusb)
 
 cd python
 python3 -m venv .venv && source .venv/bin/activate
@@ -40,49 +38,49 @@ pip install -e ".[dev]"
 # Tests du protocole (aucun matériel requis)
 pytest tests/ -q
 
-# First light (écran branché) : handshake, dump du PM byte, puis une mire 1280x480
-# macOS : libhidapi de brew n'est pas sur le chemin du loader -> on le pointe.
-export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix hidapi)/lib"
+# macOS : les libs de brew ne sont pas sur le chemin du loader -> on les pointe.
+export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix hidapi)/lib:$(brew --prefix libusb)/lib"
+
+# Affichage live (le prototype) : horloge + infos système, ~3 fps, Ctrl-C pour arrêter
+python scripts/run.py
+python scripts/run.py --fps 2 --duration 30
+
+# First light (diagnostic) : handshake + dump du PM byte, puis une mire 1280x480
 python scripts/first_light.py
 python scripts/first_light.py --dump-only     # handshake seul
 ```
 
-> Validé sur un Trofeo Vision V1.02 réel (2026-06-07) : handshake OK, **PM byte =
-> 128 → 1280×480**, et un JPEG de ~37 Ko poussé en un seul transfert s'affiche.
-
-Sur l'écran, la mire doit afficher une flèche pointant vers le **HAUT** et des
-barres **R / V / B** dans l'ordre — de quoi vérifier orientation et couleurs d'un
-coup d'œil.
+> Validé sur Trofeo Vision V1.02 réel (2026-06-07) : PM=128 → 1280×480, affichage
+> live ~5 fps stable via la reset-loop.
 
 ## Structure
 
 ```
 Trofeo/
 ├── CLAUDE.md            instructions projet pour l'agent
-├── docs/PROTOCOL.md     spec filaire du HID Type 2 (source de vérité)
-├── python/              prototype : transport hidapi + protocole + rendu
+├── docs/
+│   ├── PROTOCOL.md      spec filaire du HID Type 2 (source de vérité)
+│   └── MACOS_FEASIBILITY.md  pourquoi/comment la reset-loop (le mur HID + son contournement)
+├── python/
 │   ├── trofeo/
 │   │   ├── protocol.py  PUR : paquets/handshake/frame (testé sans matériel)
-│   │   ├── transport.py HID via hidapi
-│   │   └── render.py    mire de test + JPEG (Pillow)
-│   ├── scripts/first_light.py
+│   │   ├── transport.py reset-loop : reset (pyusb) + handshake/write (hidapi)
+│   │   └── render.py    mire + tableau de bord + JPEG (Pillow)
+│   ├── scripts/run.py          affichage live (le prototype)
+│   ├── scripts/first_light.py  diagnostic handshake + 1 frame
+│   ├── experiments/            diagnostics matériels (trace reproductible)
 │   └── tests/test_protocol.py
-└── swift/               port natif TrofeoKit (IOHIDManager) — à venir
+└── swift/               port natif (IOUSBHost reset + IOHIDManager) — à venir
 ```
 
 ## Feuille de route
 
-1. **First light Python** — handshake + image. ✅ **Fait** (PM=128 → 1280×480, mire affichée).
-2. ⚠️ **Mur macOS découvert** : streaming impossible en userspace (interface HID-class
-   verrouillée par IOHIDFamily). Voir [`docs/MACOS_FEASIBILITY.md`](docs/MACOS_FEASIBILITY.md).
-3. **Décision d'architecture** (en attente) :
-   - Daemon Linux déporté (RPi) + client Mac réseau — *recommandé*.
-   - DriverKit dext natif — lourd, succès incertain.
-   - VM Linux + USB passthrough — à vérifier.
-
-> ~~Port Swift `TrofeoKit` via IOHIDManager~~ : **abandonné pour le streaming** —
-> IOHIDManager ne peut pas émettre les transferts de contrôle requis (cul-de-sac
-> prouvé). Un composant Swift reste pertinent côté *client* selon l'architecture choisie.
+1. **First light** — handshake + image. ✅ **Fait** (PM=128 → 1280×480).
+2. **Mur macOS** (interface HID verrouillée par IOHIDFamily) → **contourné par la
+   reset-loop**. ✅ Affichage live ~5 fps stable. Voir [`docs/MACOS_FEASIBILITY.md`](docs/MACOS_FEASIBILITY.md).
+3. **Enrichir le prototype** : contenu (métriques, jauges), cadence configurable, robustesse.
+4. **Port Swift** — `IOUSBHost` reset + `IOHIDManager` SetReport (IOKit pur), pour
+   intégration dans **Iris**.
 
 ## Protocole & clean-room
 

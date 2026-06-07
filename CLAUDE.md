@@ -63,8 +63,8 @@ Init 512 o `DA DB DC DD … 01 …` → lire 512 o → valider MAGIC + `resp[12]
 ## 8. Build & run
 
 ```bash
-# Lib native HID (une fois)
-brew install hidapi
+# Libs natives (une fois) : hidapi (write frame) + libusb (reset)
+brew install hidapi libusb
 
 # Env Python
 cd python
@@ -74,10 +74,15 @@ pip install -e ".[dev]"
 # Tests (sans matériel)
 pytest tests/ -q
 
-# First light (matériel branché)
-# macOS : pointer libhidapi de brew (sinon ImportError au chargement de `hid`).
-export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix hidapi)/lib"
-python scripts/first_light.py            # handshake + mire
+# macOS : pointer les libs de brew (sinon ImportError/NoBackend au chargement)
+export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix hidapi)/lib:$(brew --prefix libusb)/lib"
+
+# Affichage live (le prototype)
+python scripts/run.py                    # horloge, ~3 fps, Ctrl-C
+python scripts/run.py --fps 2 --duration 30
+
+# First light (diagnostic)
+python scripts/first_light.py            # handshake + mire (1 frame)
 python scripts/first_light.py --dump-only
 ```
 
@@ -85,19 +90,20 @@ python scripts/first_light.py --dump-only
 > Python (os.environ avant l'import) ne marche PAS — dyld lit la variable au
 > lancement uniquement. Elle doit être dans l'environnement du shell.
 
-## 9. Port Swift / macOS — ⚠️ plan initial invalidé
+## 9. macOS & port Swift — reset-loop
 
-**Le plan « TrofeoKit via IOHIDManager » est un cul-de-sac pour le streaming**
-(prouvé sur matériel, voir `docs/MACOS_FEASIBILITY.md`) : ce device est sur une
-interface **HID-class** que IOHIDFamily verrouille ; IOHIDManager ne peut émettre
-qu'**une** frame puis ne peut pas faire le clear-halt/reset requis ; libusb ne peut
-pas claim l'interface (Errno 13, même en root).
+**La voie macOS qui marche : la reset-loop** (cf. `docs/MACOS_FEASIBILITY.md`). Ce
+device est sur une interface HID que IOHIDFamily verrouille : IOHIDManager n'envoie
+qu'**une** frame puis lock, et libusb ne peut pas claim l'iface (Errno 13). Le
+contournement validé : **`libusb reset_device()`** (niveau device, sans claim) réveille
+le device → cycle `reset → handshake → frame` à ~5 fps stable.
 
-- **Ne pas** repartir sur un transport IOHIDManager/hidapi pour streamer.
-- Décision d'architecture **en attente** (cf. README, feuille de route) :
-  daemon Linux déporté (recommandé) / DriverKit dext (lourd, incertain) / VM passthrough.
-- Le découpage `Protocol` (pur) / `Render` reste réutilisable quel que soit le choix ;
-  seul le `Transport` est impacté.
+- Transport Python : `trofeo/transport.py` = pyusb (reset) + hidapi (write). **Ne pas**
+  revenir à un transport mono-pile (hidapi seul ne streame pas).
+- **Port Swift** : `IOUSBHost` pour le reset device + `IOHIDManager` `SetReport` pour la
+  frame, en IOKit pur (zéro dépendance tierce). Réutiliser `Protocol` (pur) / `Render`.
+- **Vigilance** : on déclenche un reset USB ~3-5×/s ; innocuité long terme non établie
+  → cadence basse (2-3 fps) suffit pour horloge/métriques.
 
 ## 10. Ce qu'il ne faut PAS faire
 

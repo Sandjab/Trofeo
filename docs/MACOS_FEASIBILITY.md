@@ -5,12 +5,34 @@
 > Vision V1.02, macOS Apple Silicon) + recherche du code de référence, des issues
 > GitHub et de la doc Apple.
 
-## Verdict
+## Verdict — RÉSOLU (2026-06-07)
 
-**Il n'existe aucune voie userspace viable sur macOS pour streamer des frames vers
-ce device.** Le blocage est **structurel à macOS**, pas un défaut de notre code :
-les endpoints data (EP 0x02 OUT) sont sur une **interface de classe HID (0x03)**,
-donc **IOHIDFamily se l'approprie en exclusif** dès l'énumération.
+**Il existe une voie userspace viable sur macOS : la « reset-loop ».** Validée sur
+matériel à **~5 fps stable et fluide** (125/125 refresh sur 25 s, 0 échec). Pas de
+kext, pas de firmware, pas de daemon déporté.
+
+Le problème de fond reste réel — les endpoints data (EP 0x02 OUT) sont sur une
+**interface HID (0x03)** dont **IOHIDFamily s'empare en exclusif**, donc on ne peut
+ni la claim en libusb (Errno 13) ni envoyer plus d'une frame via IOHIDManager (lock).
+**Le contournement :** un **`libusb reset_device()`** (opération niveau *device*, qui
+ne requiert PAS de claim de l'interface) **réveille** le device après chaque frame.
+D'où le cycle :
+
+```
+reset (libusb) -> handshake -> 1 frame (hidapi/IOHIDManager) -> [lock] -> reset -> ...
+```
+
+Un cycle complet ≈ **0,21 s** (reset + handshake + frame 37 Ko), soit ~5 fps. Comme
+on repasse une frame bien avant le revert firmware (~2 s), l'image reste affichée en
+continu. **Limites honnêtes :** plafond ~5 fps (pas de vidéo fluide) ; on déclenche un
+reset USB ~3-5×/s, dont l'innocuité 24/7 sur le long terme n'est **pas** établie (à
+surveiller : stabilité, logs USB, usure).
+
+> Implémentation : `python/trofeo/transport.py` (`TrofeoDevice`), boucle dans
+> `python/scripts/run.py`. Port Swift visé : **`IOUSBHost` reset + `IOHIDManager`
+> SetReport**, en IOKit pur (zéro dépendance tierce) — le plan natif Mac est ressuscité.
+
+### Pourquoi le contournement est nécessaire (les murs directs, toujours vrais)
 
 ## Les trois murs
 
@@ -44,26 +66,20 @@ sur 0x02 — **impossible via IOHIDManager**. `IOHIDDeviceSetReportWithCallback`
 haute). « TrofeoKit IOHIDManager intégré à Iris » **ne peut pas** piloter cet écran
 en continu sur macOS.
 
-## Options (par ordre de réalisme)
+## Chemin retenu : reset-loop (natif Mac)
 
-1. **Daemon Linux déporté** (recommandé) — un petit Linux (ex. Raspberry Pi Zero 2 W)
-   branché à l'écran exécute le chemin **prouvé** (libusb interrupt-OUT, trivial sous
-   Linux : `detach_kernel_driver` sur `usbhid` + udev hidraw). Le Mac/Iris compose les
-   frames (ou envoie juste les métriques) et les pousse en **réseau** (HTTP/WS/TCP).
-   Effort **faible**, robuste, zéro entitlement. Inconvénient : matériel en plus,
-   l'écran n'est pas piloté directement par le Mac.
-2. **DriverKit dext natif** — **semaines** de travail, distribution lourde, succès
-   **incertain** face à `AppleUserHIDDrivers`. Seulement si le natif Mac est
-   non-négociable.
-3. **VM Linux + USB passthrough** sur le Mac — garderait tout sur une machine, mais
-   le passthrough USB sur Apple Silicon est **douteux/fragile**. À vérifier avant tout
-   engagement.
+C'est l'option implémentée (`run.py`). Directe, sur le Mac, sans matériel ni
+entitlement. Le seul point de vigilance est le **stress des resets répétés** dans la
+durée — à observer en usage réel (et à modérer via une cadence basse, 2-3 fps suffisent
+pour de l'horloge/métriques).
 
-### Bonus debug (pas une solution de streaming)
+### Fallbacks (si le stress des resets s'avérait problématique)
 
-Claim l'**interface vendor 1** (classe 0xff, libusb l'accepte sur macOS) et tenter
-`reset_device()` pour casser le lock **sans replug** — utile pour expérimenter, mais
-re-lock après chaque frame. Non vérifié.
+1. **Cadence basse** — réduire à 1-2 fps (resets moins fréquents) ; suffit pour un
+   écran de statut quasi-statique. Premier réflexe, zéro coût.
+2. **Daemon Linux déporté** (RPi) exécutant le chemin libusb interrupt-OUT natif Linux,
+   le Mac poussant les frames en réseau. Robuste mais matériel en plus.
+3. **DriverKit dext / VM passthrough** — lourds/incertains, non retenus sauf nécessité.
 
 ## Sources
 
