@@ -20,6 +20,7 @@ let package = Package(
             ]
         ),
         .executableTarget(name: "trofeo-cli", dependencies: ["TrofeoKit"]),
+        .executableTarget(name: "exp-input-report", dependencies: ["TrofeoKit"]),
         .testTarget(name: "TrofeoKitTests", dependencies: ["TrofeoKit"]),
     ]
 )

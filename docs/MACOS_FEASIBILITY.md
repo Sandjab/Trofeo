@@ -60,6 +60,24 @@ sur 0x02 — **impossible via IOHIDManager**. `IOHIDDeviceSetReportWithCallback`
 (async) ne sauve pas : **jamais implémenté par Apple**. Le comportement observé
 (lock après 1 frame) est solide quelle que soit la cause exacte.
 
+### Piste écartée — SetReport type Input (testée 2026-06-11)
+
+Le fil [Apple Forums #742144](https://developer.apple.com/forums/thread/742144) décrit
+un symptôme identique (SetReport OK une fois, puis `kIOReturnTimeout` jusqu'au replug)
+avec pour théorie un **verrou host-side** (IOHIDFamily attendrait un input report en
+réponse à l'output report) et pour workaround **émettre en `kIOHIDReportTypeInput`**.
+Testé sur matériel (`swift/Sources/exp-input-report/`) : **ne fonctionne pas ici**.
+
+- `out-in` : frame 1 (Out) OK → frame 2 (In) `0xE00002D6` (timeout, même lock) ;
+- `in-in` : sur état frais post-reset, handshake (Out) OK → **frame 1 (In) timeout
+  immédiat** — les écritures de type Input échouent même sans jam préalable
+  (IOHIDFamily les route probablement par EP0 `SET_REPORT(Input)`, que le firmware
+  n'implémente pas).
+
+Conclusion : pas de contournement par le report type ; la théorie host-side n'est ni
+prouvée ni réfutée, mais la voie est fermée en pratique. Non testé : type Feature
+(même routage EP0 attendu, même improbabilité côté firmware).
+
 ## Conséquence pour le plan initial
 
 **Le port Swift via IOHIDManager est un cul-de-sac pour le streaming** (confiance
